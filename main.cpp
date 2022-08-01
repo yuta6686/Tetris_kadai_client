@@ -7,9 +7,11 @@
 #include <conio.h>
 #include <time.h>
 #include <string>
+#include <vector>
 #pragma comment (lib, "Ws2_32.lib")
 
 using namespace std;
+
 
 #define PORT_NUMBER 55555
 #define HOST_NAME "Wths00680"
@@ -66,7 +68,35 @@ int     Point = 0;          // 得点
 
 
 //	プロトタイプ宣言
+void set_text_color(int color);
+void set_back_color(int color);
+void set_cursor_pos(int x, int y);
+
+void print_field(void);
+void print_block(void);
 int input_key(void);
+
+std::vector<std::string> split(std::string str, char del) {
+	int first = 0;
+	int last = str.find_first_of(del);
+
+	std::vector<std::string> result;
+
+	while (first < str.size()) {
+		std::string subStr(str, first, last - first);
+
+		result.push_back(subStr);
+
+		first = last + 1;
+		last = str.find_first_of(del, first);
+
+		if (last == std::string::npos) {
+			last = str.size();
+		}
+	}
+
+	return result;
+}
 
 int main()
 {
@@ -91,7 +121,7 @@ int main()
 		//printf("SERVER:");
 	}
 
-	
+
 	printf("Press Any Key:");
 	gets_s(szServer);
 	//szServerstr = szServer;	
@@ -157,9 +187,28 @@ int main()
 				}
 			}
 			else {
-				printf("Recv:");
+
+				//	区切り文字
+				char del = ',';
+
+				//	区切ったstring型の文字列の配列
+				vector<string> subStr = split(szBuf, del);
+				for (int i = 0; i < 200; i++) {
+					Field[i / 10][i % 10] = stoi(subStr[i]);
+				}
+				for (int i = 200; i < 200 + 4 * 4; i++) {
+					Block[(i - 200) / 4][(i - 200) % 4] = stoi(subStr[i]);
+				}
+				Block_X = stoi(subStr[216]);
+				Block_Y = stoi(subStr[217]);
+
+				print_field();      // フィールドの表示
+				print_block();      // アクティブブロックの表示
+
+				//printf("Recv:");
 				//printf("%s>%s\n", inet_ntoa(from.sin_addr), szBuf);
-				printf("%s\n", szBuf);
+				//printf("%s\n", szBuf);
+				//printf("%d", subStr.size());
 				szBuf[nRtn] = '\0';
 			}
 
@@ -169,8 +218,8 @@ int main()
 			}
 		}
 
-		
-		{		
+
+		{
 			//	こいつはブロックしてくる。
 			//gets_s(szBuf);			
 
@@ -180,7 +229,7 @@ int main()
 			if (key != 0) {
 				sprintf(szBuf, "%c", key);
 
-				printf("Send:%s\n",szBuf);
+				//printf("Send:%s\n",szBuf);
 
 				nRtn = sendto(s, szBuf, (int)strlen(szBuf) + 1, 0,
 					(LPSOCKADDR)&addrin, sizeof(addrin));
@@ -199,7 +248,7 @@ int main()
 		}
 
 
-		
+
 	}
 	closesocket(s);
 	WSACleanup();
@@ -258,4 +307,89 @@ int input_key(void)
 		break;
 	}
 	return key;
+}
+//=============================================
+// 前景色設定(0以上15以下の色番号を指定、範囲外は補正)
+//=============================================
+void set_text_color(int color)
+{
+	if (color < 0) {
+		color = 30;
+	}
+	else if (color < 8) {
+		color += 30;
+	}
+	else if (color < 16) {
+		color = (color - 8) + 90;
+	}
+	else {
+		color = 97;
+	}
+	printf("\033[%dm", color);
+}
+//=============================================
+// 背景色設定(0以上15以下の色番号を指定、範囲外は補正)
+//=============================================
+void set_back_color(int color)
+{
+	if (color < 0) {
+		color = 40;
+	}
+	else if (color < 8) {
+		color += 40;
+	}
+	else if (color < 16) {
+		color = (color - 8) + 100;
+	}
+	else {
+		color = 107;
+	}
+	printf("\033[%dm", color);
+}
+//=============================================
+// カーソル位置設定
+//=============================================
+void set_cursor_pos(int x, int y)
+{
+	printf("\033[%d;%dH", y, x);
+}
+//=================================
+void print_field(void)
+{
+	int         x = FIELD_X, y = FIELD_Y;
+
+	// フィールドの表示(固定化したブロック含む)
+	set_back_color(DARK_GRAY);
+	for (int i = 0; i < FIELD_H; i++) {
+		set_cursor_pos(x, y++);
+		for (int j = 0; j < FIELD_W; j++) {
+			if (Field[i][j] != EMPTY) {
+				set_text_color(Field[i][j]);
+				printf("■");
+			}
+			else {
+				printf("  ");
+			}
+		}
+	}
+	COLOR_RESET;
+	printf("\n\n得点：%4d", Point);
+}
+
+void print_block(void)
+{
+	int         x = FIELD_X, y = FIELD_Y;
+
+	x += Block_X * 2;
+	y += Block_Y;
+	for (int i = 0; i < BLOCK_SIZE; i++) {
+		for (int j = 0; j < BLOCK_SIZE; j++) {
+			set_cursor_pos(x + (j * 2), y + i);
+			if (Block[i][j] != EMPTY) {
+				set_text_color(Block[i][j]);
+				printf("■");
+			}
+		}
+	}
+	COLOR_RESET;
 }
